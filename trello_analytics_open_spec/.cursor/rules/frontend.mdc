@@ -1,0 +1,41 @@
+---
+description: Frontend rules for Vue 3 + TypeScript + Vite
+globs:
+  - "**/trello_analytics_front/**"
+  - "**/*.{vue,ts,tsx}"
+alwaysApply: false
+---
+
+# Frontend (Vue 3 + TypeScript + Vite)
+
+## Stack
+
+- Vue 3, TypeScript, Vite, Composition API (`<script setup>`).
+- Vue Router.
+- Code repository: `trello_analytics_front`.
+- Lock the charting library in documentation before adopting it.
+
+## Data and metrics
+
+- Do not duplicate analytics formulas on the client.
+- Fetch all metrics from backend `/api/v1`.
+- `null` / missing data ≠ `0`.
+- Show loading, empty, and error states.
+- Surface warnings about incomplete historical data and stale sync.
+
+## UI
+
+- Apply period / member / label filters consistently across related widgets.
+- Open card links in Trello (new tab).
+- For metrics, show the period and a short explanation of the calculation rule.
+- Responsive layout for desktop and tablet.
+
+## Auth
+
+- Hide actions the current role cannot use.
+- Do not rely on UI alone: backend enforces permissions.
+
+## Structure
+
+- Preferred areas: `src/pages`, `src/components`, `src/api`, `src/composables`, `src/types`.
+- Do not create Nuxt-specific directories (root Nuxt `pages/`, `server/`) — this project uses Vite, not Nuxt.

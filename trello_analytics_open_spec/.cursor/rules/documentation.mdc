@@ -1,0 +1,24 @@
+---
+description: Project documentation rules
+globs:
+  - "**/docs/**"
+  - "**/*.md"
+alwaysApply: false
+---
+
+# Documentation
+
+## Canonical store documents
+
+- `docs/technical-specification.md` — requirements / technical specification
+- `docs/architecture-decisions.md` — accepted and open decisions
+- `docs/trello-integration.md` — Trello integration and history limitations
+- As the project grows: `analytics-metrics.md`, `database.md`, `api`/OpenAPI, `local-development.md`, `deployment.md`, `operations.md`
+
+## Rules
+
+- Update the relevant document when the related functionality changes.
+- Do not use machine-absolute paths — only repository names and relative paths.
+- Do not claim Trello history availability without experiment results.
+- Document metric formulas and edge cases before or together with implementation.
+- Comment non-trivial algorithms, API limits, and ambiguous events in code; do not comment the obvious.

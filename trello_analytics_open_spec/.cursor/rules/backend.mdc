@@ -1,0 +1,47 @@
+---
+description: Go backend rules for Trello Team Analytics
+globs:
+  - "**/trello_analytics_back/**"
+  - "**/*.go"
+alwaysApply: false
+---
+
+# Backend (Go)
+
+## Stack
+
+- Language: Go.
+- API: REST with `/api/v1` prefix.
+- DB: PostgreSQL via a storage layer; schema changes only through migrations.
+- Code repository: `trello_analytics_back`.
+
+## Architecture
+
+- Separate HTTP handlers, business logic, and data access.
+- Do not compute metrics inside HTTP handlers.
+- Isolate the Trello API in a dedicated module (`client` / `importer` / `sync`).
+- Use `context.Context` for requests and background work.
+- Handle errors explicitly; never ignore them.
+- Timeouts on external requests are mandatory.
+- Do not allow concurrent conflicting sync jobs.
+- Provide health / readiness endpoints.
+
+## Data and analytics
+
+- Store raw Trello events immutably; enforce idempotency by external ids.
+- Compute metrics on the backend from stored history and workflow rules.
+- Never invent missing data.
+- Store timestamps in UTC; apply timezone for display and period boundaries.
+
+## Security
+
+- Trello secrets and passwords belong only in env / protected configuration.
+- Never return secrets in API responses.
+- Enforce role permissions on the server.
+- Logs must not contain tokens or passwords.
+
+## Tests
+
+- Unit tests for metric formulas and history interpretation.
+- Integration tests for DB, sync idempotency, and API.
+- Do not use production secrets in tests.

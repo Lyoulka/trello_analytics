@@ -1,0 +1,16 @@
+---
+description: Do not write machine-local absolute paths in OpenSpec
+alwaysApply: true
+---
+
+# No local paths in artifacts
+
+In OpenSpec (`proposal` / `design` / `tasks` / `specs`) and other store documentation,
+**do not** use machine-specific absolute paths (`C:\Users\...`, `/home/...`).
+
+Refer to the **repository name** and paths **inside** the repo:
+
+- `trello_analytics_back`, `trello_analytics_back/internal/trello/`
+- `trello_analytics_front`, `trello_analytics_front/src/pages/`
+- `trello_analytics_open_spec`, `docs/trello-integration.md`
+- `openspec/changes/<change-id>`

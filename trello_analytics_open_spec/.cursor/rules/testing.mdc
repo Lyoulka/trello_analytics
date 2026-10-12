@@ -1,0 +1,32 @@
+---
+description: Project testing requirements
+alwaysApply: false
+---
+
+# Testing
+
+## Required
+
+- New metric calculation functions must have unit tests.
+- Bug fixes must include a test that reproduces the bug.
+- Tests must be reproducible and must not use production secrets.
+- Do not disable tests just to make CI green.
+
+## Backend (Go)
+
+Cover:
+
+- Throughput, Lead Time, Cycle Time;
+- start/done detection and bug reopen;
+- multiple execution cycles;
+- period filtering/aggregation;
+- incomplete history and exclusion of unreliable events;
+- sync idempotency and import resume (integration).
+
+## Frontend
+
+Cover metric rendering, filters, empty/error states, data-quality warnings, Trello links, and role-based UI.
+
+## Spike / research
+
+For a research change (e.g. `spike-trello-history`), verifiable artifacts and documented experiment results are enough; do not implement a full analytics engine "while you're at it".

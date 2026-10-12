@@ -1,0 +1,33 @@
+# Local secrets and env overrides
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+*.token
+credentials.json
+**/secrets/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Local tooling caches
+*.log
+tmp/
+.cache/
+
+# Backend / frontend build artifacts
+bin/
+dist/
+coverage/
+node_modules/
+*.out
+*.test
+
+# Nested repo backup (local only)
+**/.git.bak-local-history/

@@ -1,0 +1,15 @@
+﻿---
+description: Go backend conventions for trello_analytics_back
+globs: "**/*.{go,sql}"
+alwaysApply: false
+---
+
+# Backend (Go)
+
+- REST `/api/v1`; separate handlers, business logic, storage.
+- Do not compute metrics in HTTP handlers.
+- Isolate Trello in client/importer/sync; timeouts mandatory.
+- Schema only via migrations; UTC timestamps; immutable raw events; idempotent import.
+- Secrets in env only; enforce authz on server; no secrets in logs/responses.
+- Unit tests for metrics/history; integration for sync/API.
+- Details SSOT: trello_analytics_open_spec `.cursor/rules/backend.mdc` and AGENTS.md.

@@ -1,0 +1,13 @@
+﻿---
+description: Vue 3 frontend conventions for trello_analytics_front
+globs: "**/*.{vue,ts,tsx}"
+alwaysApply: false
+---
+
+# Frontend (Vue 3 + TypeScript + Vite)
+
+- Composition API `<script setup>`; Vue Router; not Nuxt.
+- No client-side analytics formulas — use backend `/api/v1`.
+- null/missing ≠ 0; loading/empty/error; incomplete-history warnings.
+- Preferred: src/pages, src/components, src/api, src/composables, src/types.
+- Details SSOT: trello_analytics_open_spec `.cursor/rules/frontend.mdc` and AGENTS.md.

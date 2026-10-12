@@ -1,0 +1,37 @@
+﻿---
+description: Shared quality, OpenSpec, and data-integrity rules for all roles
+alwaysApply: true
+---
+
+# Project quality (SSOT)
+
+## OpenSpec
+
+- OpenSpec is the source of truth for change requirements.
+- Read related specs/design/tasks before coding.
+- Do not invent business rules silently; escalate ambiguity.
+- Update the spec when requirements or decisions change.
+- Do not edit unrelated archived OpenSpec changes.
+
+## Quality
+
+- New business logic ships with tests.
+- Bug fixes preferably include a regression test.
+- Do not disable checks to force a green result.
+- Do not claim a check passed if it was not run.
+- Prefer clear, maintainable code.
+- Comment business rules, non-obvious decisions, limits, and trade-offs — not every line.
+
+## Data and analytics
+
+- Store raw Trello history; compute metrics from stored events and workflow rules.
+- Never invent missing events or timestamps.
+- Incomplete history → document and warn; do not silently fill gaps.
+- Timestamps in UTC in storage; timezone for display and period boundaries.
+
+## Security and Git
+
+- Secrets only in env / protected config; never commit real secrets.
+- No tokens/passwords in logs or API responses to the client.
+- Trello calls only from backend.
+- No automatic commit, push, or deploy.

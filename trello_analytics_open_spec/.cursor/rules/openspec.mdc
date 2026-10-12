@@ -1,0 +1,30 @@
+---
+description: Working with the OpenSpec store trello-analytics
+alwaysApply: true
+---
+
+# OpenSpec
+
+## Store
+
+- Store id: `trello-analytics`.
+- Specs and changes live only in `trello_analytics_open_spec`.
+- In `trello_analytics_back` / `trello_analytics_front` keep only `openspec/config.yaml` with `store: trello-analytics`.
+- Do not create local `openspec/specs` or `openspec/changes` in code repositories.
+
+## Stack in artifacts
+
+- Backend = Go; Frontend = Vue 3 + TypeScript + Vite.
+- Do not propose Node.js API or Nuxt 3 as the target stack.
+
+## Process
+
+1. Before implementation: proposal / design / specs / tasks.
+2. Track progress only via checkboxes in `tasks.md`.
+3. Apply per repository: take the first open task in your section.
+4. Do not implement unrelated modules "while you're at it".
+5. Do not start the analytics engine / Dashboard until the blocking history spike is done (if the work depends on it).
+
+## Paths
+
+- Use repository names and relative paths only — never `C:\Users\...`.

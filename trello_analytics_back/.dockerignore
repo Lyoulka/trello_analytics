@@ -1,0 +1,13 @@
+.git
+.cursor
+.tmp
+tmp
+*.md
+.env
+.env.*
+!.env.example
+bin/
+dist/
+coverage/
+*.test
+*.out

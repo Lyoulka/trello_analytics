@@ -1,0 +1,56 @@
+schema: spec-driven
+
+context: |
+  Проект Trello Team Analytics: внутреннее веб-приложение для аналитики командной
+  разработки на основе одной доски Trello.
+
+  Целевой стек (утверждён окончательно):
+    - Backend: Go (REST API), репозиторий trello_analytics_back;
+    - Frontend: Vue 3 + TypeScript + Vite, репозиторий trello_analytics_front;
+    - Database: PostgreSQL;
+    - Local development: Docker Compose;
+    - Production: существующий сервер с Nginx, Go через systemd, PostgreSQL
+      без обязательного использования Docker;
+    - Requirements: OpenSpec store trello-analytics (этот репозиторий);
+    - IDE: Cursor.
+
+  Главный принцип: сначала достоверные данные и прозрачные формулы, затем
+  визуализация и автоматизация. Нельзя подменять отсутствующие данные Trello
+  предположительными датами или выдуманными событиями.
+
+  Спеки и changes живут только в этом store, не в код-репозиториях.
+  Прогресс реализации change отмечается только чекбоксами в tasks.md.
+  В артефактах не указывать абсолютные пути машин — только имена репозиториев
+  (trello_analytics_front, trello_analytics_back, trello_analytics_open_spec)
+  и пути внутри них.
+  Все артефакты писать на русском языке.
+
+  Источник требований: docs/technical-specification.md.
+  Принятые архитектурные решения: docs/architecture-decisions.md.
+  Интеграция с Trello и ограничения истории: docs/trello-integration.md.
+
+rules:
+  proposal:
+    - В разделе Impact явно перечислить затронутые репозитории (front / back / open_spec) и что вне scope
+  design:
+    - Контракт API между back и front описывать в design.md (эндпоинт, метод, request/response), если change затрагивает API
+    - Не предполагать доступность или глубину истории Trello без подтверждения экспериментом
+  tasks:
+    - "Только markdown-чекбоксы `- [ ]` / `- [x]`; нумерация N.M внутри секций"
+    - "Секции группировать по репозиторию, например `## 1. Backend (trello_analytics_back)`, `## 2. Frontend (trello_analytics_front)`, `## 3. Docs (trello_analytics_open_spec)`"
+    - Порядок в файле = порядок исполнения; бэкенд-контракт раньше фронтенда, который его использует
+    - Один пункт = один проверяемый результат (файл/эндпоинт/экран/приёмка), не «сделать весь бэк»
+    - "Зависимости не прыгать: не ставить позже то, что блокирует более ранний пункт"
+    - Не дублировать статусы в design.md / proposal.md
+
+operations:
+  apply:
+    guidance:
+      - Перед кодом открой tasks.md активного change
+      - Реализуй задачи только в том репозитории, который сейчас открыт (front, back или open_spec)
+      - Бери первую сверху незакрытую задачу `- [ ]` своего репозитория; не перескакивай
+      - После шага сразу отметь `- [x]` в tasks.md
+      - Не реализуй аналитический движок и Dashboard в рамках research/spike changes
+  archive:
+    guidance:
+      - Архивируй change только если все обязательные пункты tasks.md закрыты `- [x]`

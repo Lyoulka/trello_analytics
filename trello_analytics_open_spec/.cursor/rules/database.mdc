@@ -1,0 +1,30 @@
+---
+description: PostgreSQL and migration rules
+globs:
+  - "**/migrations/**"
+  - "**/*.{sql}"
+alwaysApply: false
+---
+
+# Database (PostgreSQL)
+
+## Required practices
+
+- Change schema only through migrations.
+- Foreign keys and integrity constraints are mandatory.
+- Enforce uniqueness of external Trello ids (`trello_*_id`).
+- Add indexes for time-range queries, card ids, and event types.
+- Store timestamps in UTC.
+- Keep raw events (`card_actions` and equivalents) separate from aggregated metrics.
+
+## Sync / history
+
+- `trello_action_id` is unique — the basis for idempotency.
+- Re-import must not create duplicates or corrupt statistics.
+- Event history is retained independently of metric recalculation.
+
+## Forbidden
+
+- Changing the production schema manually without a migration.
+- Deleting raw events to "simplify" formulas.
+- Inventing dates to fill gaps in missing history.

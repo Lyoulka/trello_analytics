@@ -1,0 +1,16 @@
+---
+description: Security rules
+alwaysApply: true
+---
+
+# Security
+
+- Secrets (Trello key/token, DB passwords, session secrets) live only in env / protected configuration outside Git.
+- Do not commit `.env`; keep `.env.example` without real secrets.
+- The API must not return integration secrets in plaintext.
+- Store passwords only as secure hashes (when using local auth).
+- Enforce permissions on the backend for every protected endpoint.
+- Call Trello only from the backend.
+- Logs must not contain tokens, passwords, or sensitive payloads.
+- Configure CORS / cookies / HTTPS for the production domain; do not invent server details without surveying the real infrastructure.
+- Do not change production Nginx/systemd config without an explicit task and impact check on other apps.

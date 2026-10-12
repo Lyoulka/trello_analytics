@@ -1,0 +1,11 @@
+.git
+.cursor
+node_modules
+dist
+coverage
+*.md
+.env
+.env.*
+!.env.example
+.tmp
+tmp

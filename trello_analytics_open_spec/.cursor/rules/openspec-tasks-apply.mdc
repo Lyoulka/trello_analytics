@@ -1,0 +1,33 @@
+---
+description: OpenSpec apply queue — take the next open task from tasks.md
+alwaysApply: true
+---
+
+# OpenSpec apply: queue from tasks.md
+
+## Source of truth for progress
+
+For an active change, status lives **only** in checkboxes in
+`openspec/changes/<change>/tasks.md` (store `trello-analytics`).
+
+## Before any implementation
+
+1. Identify the active change (from the user message, workset, or `openspec list --store trello-analytics`).
+2. Open its `tasks.md`.
+3. Determine the current repository: `trello_analytics_back`, `trello_analytics_front`, or `trello_analytics_open_spec` (docs/rules).
+4. Find the **first** `- [ ]` line top-to-bottom in that repository's section.
+5. If earlier unfinished tasks block it (e.g. a backend contract required by the frontend) — warn the user.
+6. Briefly name the task id (e.g. `2.1`) and what you will do; do **only that** task.
+7. For research/spike work, do not implement the analytics engine or Dashboard outside explicit `tasks.md` items.
+
+## After finishing a step
+
+1. In the same `tasks.md`, mark the completed item `- [x]`.
+2. Mark only what was actually done and verified against the ready criterion.
+3. Do not archive the change while required open items remain in `tasks.md`.
+
+## Do not
+
+- Start in the middle of the list.
+- Rewrite all of `tasks.md` just for progress — only checkboxes and targeted clarifications.
+- Use machine-absolute paths — repository names only.

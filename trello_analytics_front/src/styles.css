@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  line-height: 1.5;
+  color: #1a1a1a;
+  background: #f6f7f9;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 1.25rem;
+}
+
+.lead {
+  color: #444;
+}
+
+[data-status='ok'] {
+  color: #0a7a32;
+}
+
+[data-status='error'] {
+  color: #b00020;
+}
+
+[data-status='loading'] {
+  color: #666;
+}

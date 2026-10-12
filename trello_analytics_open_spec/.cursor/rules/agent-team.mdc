@@ -1,0 +1,33 @@
+﻿---
+description: AI agent team process — orchestration, handoff, quality gates
+alwaysApply: true
+---
+
+# Agent team
+
+## Roles
+
+Use project subagents: `orchestrator`, `architect`, `worker-go`, `worker-frontend`, `worker-db`, `worker-devops`, `debugger`, `tester`, `reviewer`.
+
+Reports must follow skill `agent-handoff` templates. Do not invent alternate report formats.
+
+## Pipeline
+
+1. Requirements ready (OpenSpec change artifacts).
+2. Architect only when contracts/architecture are unclear or cross-repo impact is material.
+3. One responsible Worker implements the scoped task.
+4. Worker self-check (only claim checks that actually ran).
+5. Independent Tester and Reviewer.
+6. Fixes via Worker; Debugger only on defects / failing tests / integration issues.
+7. Re-check affected scenarios; accept against OpenSpec/`tasks.md`; Orchestrator summary.
+
+## Short path
+
+Docs/config/cosmetic with no API/DB contract change may skip Architect and use a lighter Tester+Reviewer pass. Quality gates and acceptance criteria still apply.
+
+## Handoff rules
+
+- Next role starts only with the previous role's report (or explicit Orchestrator package).
+- Do not have two agents edit the same files concurrently.
+- Debugger is not automatic after every code change.
+- No commit / push / deploy without explicit user approval.
