@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ExternalLink } from 'lucide-vue-next'
 import { fetchCards, trelloCardUrl } from '@/api/cards'
+import { fetchMembers } from '@/api/members'
 import { messageFromUnknown } from '@/api/errors'
 import { formatDateTime } from '@/composables/format'
 import type { CardListItem } from '@/types/api'
@@ -42,6 +43,8 @@ const updatedFrom = ref('')
 const updatedTo = ref('')
 const historyOpen = ref(false)
 const historyCardId = ref<string | null>(null)
+/** id → display name for current assignees (from GET /members). */
+const memberNamesById = ref<Record<string, string>>({})
 
 function openHistory(cardId: string) {
   historyCardId.value = cardId
@@ -85,6 +88,28 @@ function formatUpdated(c: CardListItem): string {
   return when
 }
 
+function assigneesLabel(c: CardListItem): string {
+  const ids = c.member_ids ?? []
+  if (!ids.length) return '—'
+  const names = ids.map((id) => memberNamesById.value[id]?.trim() || id.slice(0, 8))
+  return names.join(', ')
+}
+
+async function loadMembers() {
+  try {
+    const res = await fetchMembers()
+    const map: Record<string, string> = {}
+    for (const m of res.members ?? []) {
+      const label = m.full_name?.trim() || m.username?.trim() || m.id.slice(0, 8)
+      map[m.id] = label
+    }
+    memberNamesById.value = map
+  } catch {
+    // Cards list still usable with truncated ids if members fail.
+    memberNamesById.value = {}
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = null
@@ -110,6 +135,10 @@ async function load() {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  void loadMembers()
+})
 
 function applySearch() {
   q.value = searchDraft.value.trim()
@@ -248,6 +277,7 @@ watch([offset, sort, order, archived, q], () => void load(), { immediate: true }
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Список</TableHead>
+              <TableHead>Исполнители</TableHead>
               <TableHead>Обновлено</TableHead>
               <TableHead>Архив</TableHead>
               <TableHead>Trello</TableHead>
@@ -258,6 +288,7 @@ watch([offset, sort, order, archived, q], () => void load(), { immediate: true }
             <TableRow v-for="c in items" :key="c.id">
               <TableCell class="font-medium">{{ c.name }}</TableCell>
               <TableCell>{{ c.current_list_name ?? '—' }}</TableCell>
+              <TableCell class="text-xs">{{ assigneesLabel(c) }}</TableCell>
               <TableCell class="text-xs">
                 {{ formatUpdated(c) }}
               </TableCell>
