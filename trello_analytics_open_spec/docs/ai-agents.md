@@ -9,7 +9,7 @@
 |----------|------|------------|
 | Subagents | `.cursor/agents/*.md` | Роли с изолированным контекстом; вызов `/name` или делегирование |
 | Rules | `.cursor/rules/*.mdc` | SSOT общих и scoped правил |
-| Skills | `.cursor/skills/*/SKILL.md` | `agent-handoff` — шаблоны отчётов; OpenSpec skills без изменений |
+| Skills | `.cursor/skills/*/SKILL.md` | `agent-handoff` — шаблоны отчётов; `browser-qa` — live UI цикл; OpenSpec skills без изменений |
 | Commands | `.cursor/commands/role-*.md` | Ручной запуск ролей |
 | AGENTS.md | корень репозитория | Краткий always-on контекст |
 
@@ -28,6 +28,7 @@
 | `/tester` | Независимый QA |
 | `/reviewer` | Ревью (readonly) |
 | `/debugger` | Дефекты (не после каждого diff) |
+| `/browser-qa` или `/role-browser-qa` | Live UI в реальном браузере + цикл исправления |
 
 Специализации Worker — **отдельные агенты** (лучше матчинг `description` в Cursor).
 
@@ -43,10 +44,13 @@
 8. Повторные проверки  
 9. Приёмка по критериям  
 10. Orchestrator Summary  
+11. Опционально: `/browser-qa` — проверка работающего UI в реальном браузере; при багах цикл Defect Package → Worker → Reviewer → Tester → повтор в браузере  
 
 **Short path:** docs/config/cosmetic без смены API/БД — без Architect, облегчённые Tester+Reviewer; критерии приёмки обязательны.
 
 Передача: следующая роль только с отчётом предыдущей (`agent-handoff`). Не редактировать одни файлы двумя агентами параллельно. Commit/push/deploy — только по явному разрешению.
+
+**Browser QA:** не правит код приложения; требует Browser MCP (`cursor-ide-browser`) или Playwright. Без инструмента — BLOCKED, без имитации. Делегирование Worker/Reviewer/Tester через Task, если доступно; иначе ручной handoff `/role-*`. Nested subagent может не уметь запускать дочерних — тогда только Defect Package + NEXT_ACTION.
 
 ## Примеры запуска ролей
 
@@ -78,6 +82,14 @@
 /debugger Падает тест TestSyncIdempotent: <лог>. Найди первопричину.
 ```
 
+```text
+/browser-qa Проверь http://localhost:5173 по OpenSpec change X; sync с Trello не запускать
+```
+
+```text
+/role-browser-qa Только Dashboard и фильтры; найденные баги — через Worker/Reviewer/Tester
+```
+
 ## Пример полного цикла
 
 1. Пользователь: `/role-orchestrate` change `add-throughput-api`, task `1.1`.  
@@ -97,7 +109,9 @@
 | Делегирование subagent по `description` | Старт Orchestrator или `/role-*` |
 | Подхват rules / AGENTS.md | Передача отчётов между шагами |
 | OpenSpec skills (`opsx-*`) | Разрешение на commit/push/deploy |
+| Browser QA Task-цикл Worker→Reviewer→Tester (если parent Agent + Task) | Handoff `/role-*`, если nested Task недоступен |
 | | Short path vs полный цикл (решает Orchestrator/пользователь) |
+| | Live Trello sync / разрушительные действия с данными |
 
 ## Конфликты стека (зафиксировано)
 
@@ -108,7 +122,7 @@
 
 ## Синхронизация зеркал
 
-После изменения агентов/rules/skills/commands в open_spec скопируйте `.cursor/agents`, `.cursor/skills/agent-handoff`, `.cursor/commands/role-*` и при необходимости `AGENTS.md` / rules в:
+После изменения агентов/rules/skills/commands в open_spec скопируйте `.cursor/agents`, `.cursor/skills/agent-handoff`, `.cursor/skills/browser-qa`, `.cursor/commands/role-*` и при необходимости `AGENTS.md` / rules в:
 
 - `trello_analytics/.cursor/` (workspace root)
 - `trello_analytics_back/.cursor/`
@@ -118,5 +132,6 @@
 
 - Нет гарантированного автозапуска всей цепочки ролей end-to-end.  
 - Subagents не видят историю родительского чата — передавайте Task package и отчёты явно.  
-- `readonly: true` ограничивает запись у Architect/Tester/Reviewer.  
-- Параллельные агенты без изоляции могут конфликтовать по файлам.
+- `readonly: true` ограничивает запись у Architect/Tester/Reviewer/Browser QA.  
+- Параллельные агенты без изоляции могут конфликтовать по файлам.  
+- Nested subagent часто не может запускать дочерних — Browser QA тогда работает в режиме handoff.

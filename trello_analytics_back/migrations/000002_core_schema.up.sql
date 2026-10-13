@@ -32,7 +32,6 @@ CREATE TABLE cards (
     board_id              UUID NOT NULL REFERENCES boards (id) ON DELETE RESTRICT,
     name                  TEXT NOT NULL,
     description           TEXT NULL,
-    url                   TEXT NULL,
     current_list_id       UUID NULL REFERENCES trello_lists (id) ON DELETE RESTRICT,
     created_at_trello     TIMESTAMPTZ NULL,
     is_archived           BOOLEAN NOT NULL DEFAULT false,

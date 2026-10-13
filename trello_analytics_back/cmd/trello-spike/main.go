@@ -222,7 +222,7 @@ func runBoard(args []string) error {
 	}
 	_ = w.Write(map[string]any{"kind": "board", "id": board.ID, "name": board.Name, "closed": board.Closed, "dateLastActivity": board.DateLastActivity})
 
-	lists, err := client.GetLists(ctx, boardID)
+	lists, err := client.GetLists(ctx, boardID, "all")
 	if err != nil {
 		return err
 	}

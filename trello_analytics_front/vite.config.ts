@@ -1,6 +1,8 @@
 /// <reference types="vitest/config" />
+import path from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -8,7 +10,12 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_API_PROXY_TARGET || env.VITE_API_PROXY_TARGET || 'http://backend:8080'
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), tailwindcss()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
     server: {
       host: '0.0.0.0',
       port: 5173,

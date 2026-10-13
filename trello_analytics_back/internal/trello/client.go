@@ -7,31 +7,53 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const defaultBaseURL = "https://api.trello.com/1"
+const (
+	defaultBaseURL = "https://api.trello.com/1"
+	defaultTimeout = 30 * time.Second
+)
 
-// Client is a thin read-only Trello REST client (stdlib only; research/spike use).
+// Client is a thin read-only Trello REST client (stdlib only).
+// Credentials must come from env / protected config — never hardcode or persist in DB.
 type Client struct {
 	HTTP    *http.Client
 	BaseURL string
 	Key     string
 	Token   string
+
+	// RetryMaxAttempts overrides default (5). Values <= 0 mean default.
+	RetryMaxAttempts int
+	// Sleep and Jitter are optional hooks for tests (nil → production defaults).
+	Sleep  sleepFunc
+	Jitter func(max time.Duration) time.Duration
 }
 
-// New creates a Client with a reasonable timeout. Key/token must come from env/caller — never hardcode.
+// New creates a Client with a 30s timeout. Key/token must come from env/caller — never hardcode.
 func New(key, token string) *Client {
 	return &Client{
 		HTTP: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultTimeout,
 		},
 		BaseURL: defaultBaseURL,
 		Key:     key,
 		Token:   token,
 	}
+}
+
+// NewFromEnv builds a Client from TRELLO_API_KEY and TRELLO_TOKEN.
+// Returns an error if either credential is missing (no silent empty auth).
+func NewFromEnv() (*Client, error) {
+	key := os.Getenv("TRELLO_API_KEY")
+	token := os.Getenv("TRELLO_TOKEN")
+	if key == "" || token == "" {
+		return nil, fmt.Errorf("trello: TRELLO_API_KEY and TRELLO_TOKEN are required")
+	}
+	return New(key, token), nil
 }
 
 // GetBoard GET /boards/{id}
@@ -43,24 +65,51 @@ func (c *Client) GetBoard(ctx context.Context, boardID string) (*Board, error) {
 	return &b, nil
 }
 
-// GetLists GET /boards/{id}/lists
-func (c *Client) GetLists(ctx context.Context, boardID string) ([]List, error) {
+// GetLists GET /boards/{id}/lists?filter=...
+// filter: "all" | "open" | "closed" (empty → Trello default, typically open).
+func (c *Client) GetLists(ctx context.Context, boardID string, filter string) ([]List, error) {
+	q := url.Values{}
+	if filter != "" {
+		q.Set("filter", filter)
+	}
 	var lists []List
-	if err := c.getJSON(ctx, "/boards/"+url.PathEscape(boardID)+"/lists", nil, &lists); err != nil {
+	if err := c.getJSON(ctx, "/boards/"+url.PathEscape(boardID)+"/lists", q, &lists); err != nil {
 		return nil, err
 	}
 	return lists, nil
 }
 
+// GetMembers GET /boards/{id}/members
+func (c *Client) GetMembers(ctx context.Context, boardID string) ([]Member, error) {
+	q := url.Values{}
+	q.Set("fields", "id,fullName,username,deactivated")
+	var members []Member
+	if err := c.getJSON(ctx, "/boards/"+url.PathEscape(boardID)+"/members", q, &members); err != nil {
+		return nil, err
+	}
+	return members, nil
+}
+
+// GetLabels GET /boards/{id}/labels
+func (c *Client) GetLabels(ctx context.Context, boardID string) ([]Label, error) {
+	q := url.Values{}
+	q.Set("fields", "id,idBoard,name,color")
+	var labels []Label
+	if err := c.getJSON(ctx, "/boards/"+url.PathEscape(boardID)+"/labels", q, &labels); err != nil {
+		return nil, err
+	}
+	return labels, nil
+}
+
 // GetCards GET /boards/{id}/cards?filter=...
 // filter: "all" | "open" | "closed" (Trello card filters).
-// fields limited to keep payload smaller on large boards (spike observed 3k+ cards).
+// fields include idMembers/idLabels for junction sync; avoid nested members/labels payloads.
 func (c *Client) GetCards(ctx context.Context, boardID, filter string) ([]Card, error) {
 	q := url.Values{}
 	if filter != "" {
 		q.Set("filter", filter)
 	}
-	q.Set("fields", "id,name,closed,idList,idBoard,dateLastActivity")
+	q.Set("fields", "id,name,closed,idList,idBoard,dateLastActivity,idMembers,idLabels")
 	var cards []Card
 	if err := c.getJSON(ctx, "/boards/"+url.PathEscape(boardID)+"/cards", q, &cards); err != nil {
 		return nil, err
@@ -93,48 +142,80 @@ func (c *Client) getActions(ctx context.Context, path string, limit int, before 
 	return actions, nil
 }
 
-// DoRaw performs GET path with optional query (auth injected). Used by errors mode.
+// DoRaw performs GET path with optional query (auth injected). Used by spike/errors mode.
+// Does not retry — callers that need retry use JSON helpers (getJSON).
 // Returns status, body, redacted URL string.
 func (c *Client) DoRaw(ctx context.Context, path string, extra url.Values, overrideToken string) (status int, body []byte, redactedURL string, err error) {
+	status, body, redactedURL, _, err = c.doOnce(ctx, path, extra, overrideToken)
+	return status, body, redactedURL, err
+}
+
+func (c *Client) doOnce(ctx context.Context, path string, extra url.Values, overrideToken string) (status int, body []byte, redactedURL string, retryAfter time.Duration, err error) {
 	u, err := c.buildURL(path, extra, overrideToken)
 	if err != nil {
-		return 0, nil, "", err
+		return 0, nil, "", 0, err
 	}
 	redactedURL = RedactURL(u.String(), c.Key, c.Token, overrideToken)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return 0, nil, redactedURL, err
+		return 0, nil, redactedURL, 0, err
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return 0, nil, redactedURL, err
+		return 0, nil, redactedURL, 0, err
 	}
 	defer resp.Body.Close()
+	retryAfter = parseRetryAfter(resp.Header.Get("Retry-After"))
 	// Boards can return large card/action payloads; 1 MiB truncates JSON mid-stream.
 	const maxBody = 32 << 20
 	body, err = io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
-		return resp.StatusCode, nil, redactedURL, err
+		return resp.StatusCode, nil, redactedURL, retryAfter, err
 	}
 	if len(body) > maxBody {
-		return resp.StatusCode, nil, redactedURL, fmt.Errorf("trello response exceeds %d bytes (url=%s)", maxBody, redactedURL)
+		return resp.StatusCode, nil, redactedURL, retryAfter, fmt.Errorf("trello response exceeds %d bytes (url=%s)", maxBody, redactedURL)
 	}
-	return resp.StatusCode, body, redactedURL, nil
+	return resp.StatusCode, body, redactedURL, retryAfter, nil
+}
+
+func parseRetryAfter(h string) time.Duration {
+	h = strings.TrimSpace(h)
+	if h == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(h); err == nil && secs >= 0 {
+		return time.Duration(secs) * time.Second
+	}
+	if t, err := http.ParseTime(h); err == nil {
+		d := time.Until(t)
+		if d < 0 {
+			return 0
+		}
+		return d
+	}
+	return 0
 }
 
 func (c *Client) getJSON(ctx context.Context, path string, extra url.Values, dest any) error {
-	status, body, redacted, err := c.DoRaw(ctx, path, extra, "")
+	return c.withRetry(ctx, func() error {
+		return c.getJSONOnce(ctx, path, extra, dest)
+	})
+}
+
+func (c *Client) getJSONOnce(ctx context.Context, path string, extra url.Values, dest any) error {
+	status, body, redacted, retryAfter, err := c.doOnce(ctx, path, extra, "")
 	if err != nil {
 		return err
 	}
 	if status < 200 || status >= 300 {
-		return &APIError{
+		return mapAPIError(&APIError{
 			StatusCode: status,
 			Status:     fmt.Sprintf("%d", status),
-			Body:       string(body),
+			Body:       truncate(string(body), 200),
 			URL:        redacted,
-		}
+			RetryAfter: retryAfter,
+		})
 	}
 	if err := json.Unmarshal(body, dest); err != nil {
 		return fmt.Errorf("decode json: %w (url=%s)", err, redacted)

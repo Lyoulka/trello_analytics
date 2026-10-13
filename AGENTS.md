@@ -6,4 +6,4 @@
 
 Стек приложения: Go + Vue/Vite + PostgreSQL. Не предлагать Nuxt/Node API.
 
-Роли: `/orchestrator`, `/architect`, `/worker-go`, `/worker-frontend`, `/worker-db`, `/worker-devops`, `/tester`, `/reviewer`, `/debugger`.
+Роли: `/orchestrator`, `/architect`, `/worker-go`, `/worker-frontend`, `/worker-db`, `/worker-devops`, `/tester`, `/reviewer`, `/debugger`, `/browser-qa`.

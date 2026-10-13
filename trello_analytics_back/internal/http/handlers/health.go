@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -55,10 +54,4 @@ func (h *Health) Readiness(w http.ResponseWriter, r *http.Request) {
 // APIHealth is the versioned health probe for frontend / proxy checks.
 func (h *Health) APIHealth(w http.ResponseWriter, r *http.Request) {
 	h.Readiness(w, r)
-}
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
 }

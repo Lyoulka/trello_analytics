@@ -58,3 +58,115 @@ func TestGetBoardActionsHTTPTest(t *testing.T) {
 		t.Fatalf("unexpected actions: %+v", actions)
 	}
 }
+
+func TestAPIErrorClassification(t *testing.T) {
+	cases := []struct {
+		status int
+		check  func(error) bool
+		name   string
+	}{
+		{401, IsUnauthorized, "401"},
+		{404, IsNotFound, "404"},
+		{429, IsRateLimited, "429"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				http.Error(w, "nope", tc.status)
+			}))
+			defer srv.Close()
+
+			c := New("k", "t")
+			c.BaseURL = srv.URL
+			c.HTTP = srv.Client()
+
+			_, err := c.GetBoard(context.Background(), "b1")
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !tc.check(err) {
+				t.Fatalf("classification failed for %s: %v", tc.name, err)
+			}
+			if strings.Contains(err.Error(), "k") && strings.Contains(err.Error(), "token=") {
+				t.Fatalf("possible secret leak in error: %v", err)
+			}
+		})
+	}
+}
+
+func TestGetCardsRequestsIdMembersAndIdLabels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/cards") {
+			http.NotFound(w, r)
+			return
+		}
+		fields := r.URL.Query().Get("fields")
+		if !strings.Contains(fields, "idMembers") || !strings.Contains(fields, "idLabels") {
+			t.Errorf("GetCards fields missing link ids: %q", fields)
+		}
+		_ = json.NewEncoder(w).Encode([]Card{{
+			ID: "c1", Name: "Card", IDList: "l1", IDBoard: "b1",
+			IDMembers: []string{"m1"}, IDLabels: []string{"lab1"},
+		}})
+	}))
+	defer srv.Close()
+
+	c := New("k", "t")
+	c.BaseURL = srv.URL
+	c.HTTP = srv.Client()
+
+	cards, err := c.GetCards(context.Background(), "b1", "all")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 1 || len(cards[0].IDMembers) != 1 || cards[0].IDMembers[0] != "m1" {
+		t.Fatalf("idMembers: %+v", cards)
+	}
+	if len(cards[0].IDLabels) != 1 || cards[0].IDLabels[0] != "lab1" {
+		t.Fatalf("idLabels: %+v", cards)
+	}
+}
+
+func TestGetMembersAndLabels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/members"):
+			_ = json.NewEncoder(w).Encode([]Member{{ID: "m1", FullName: "Ada", Username: "ada"}})
+		case strings.HasSuffix(r.URL.Path, "/labels"):
+			_ = json.NewEncoder(w).Encode([]Label{{ID: "l1", Name: "bug", Color: "red", IDBoard: "b1"}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	c := New("k", "t")
+	c.BaseURL = srv.URL
+	c.HTTP = srv.Client()
+
+	members, err := c.GetMembers(context.Background(), "b1")
+	if err != nil || len(members) != 1 || members[0].ID != "m1" {
+		t.Fatalf("members: %+v err=%v", members, err)
+	}
+	labels, err := c.GetLabels(context.Background(), "b1")
+	if err != nil || len(labels) != 1 || labels[0].ID != "l1" {
+		t.Fatalf("labels: %+v err=%v", labels, err)
+	}
+}
+
+func TestNewFromEnvRequiresCredentials(t *testing.T) {
+	t.Setenv("TRELLO_API_KEY", "")
+	t.Setenv("TRELLO_TOKEN", "")
+	if _, err := NewFromEnv(); err == nil {
+		t.Fatal("expected error when credentials missing")
+	}
+	t.Setenv("TRELLO_API_KEY", "k")
+	t.Setenv("TRELLO_TOKEN", "tok")
+	c, err := NewFromEnv()
+	if err != nil || c.Key != "k" || c.Token != "tok" {
+		t.Fatalf("NewFromEnv: %+v err=%v", c, err)
+	}
+	if c.HTTP == nil || c.HTTP.Timeout != defaultTimeout {
+		t.Fatalf("expected 30s timeout, got %+v", c.HTTP)
+	}
+}

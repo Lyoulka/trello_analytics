@@ -14,26 +14,26 @@
 
 ## 1. Backend (trello_analytics_back)
 
-- [ ] 1.1 Реализовать password hashing, sessions/cookies, POST login/logout, GET me.
-- [ ] 1.2 Реализовать bootstrap Admin из env при пустых users.
-- [ ] 1.3 Реализовать Admin users API (create/list/update/deactivate).
-- [ ] 1.4 Добавить RBAC middleware и матрицу прав по design.
-- [ ] 1.5 Подключить analytics endpoints к сервису метрик с фильтрами и warnings.
-- [ ] 1.6 Реализовать cards list/detail/history с пагинацией и сортировкой.
-- [ ] 1.7 Реализовать reports daily/period/preview.
-- [ ] 1.8 Реализовать settings + workflow GET/PATCH|PUT с маскированием секретов.
-- [ ] 1.9 Привязать sync start/status/history/retry к ролям; integration-тесты authz.
-- [ ] 1.10 Опубликовать OpenAPI или `docs/api.md`.
+- [x] 1.1 Реализовать password hashing, sessions/cookies, POST login/logout, GET me.
+- [x] 1.2 Реализовать bootstrap Admin из env при пустых users.
+- [x] 1.3 Реализовать Admin users API (create/list/update/deactivate).
+- [x] 1.4 Добавить RBAC middleware и матрицу прав по design.
+- [x] 1.5 Подключить analytics endpoints к сервису метрик с фильтрами и warnings.
+- [x] 1.6 Реализовать cards list/detail/history с пагинацией и сортировкой.
+- [x] 1.7 Реализовать reports daily/period/preview.
+- [x] 1.8 Реализовать settings + workflow GET/PATCH|PUT с маскированием секретов.
+- [x] 1.9 Привязать sync start/status/history/retry к ролям; integration-тесты authz.
+- [x] 1.10 Опубликовать OpenAPI или `docs/api.md`.
 
 ## 2. Frontend (trello_analytics_front)
 
-- [ ] 2.1 Нет обязательных UI-задач (типы можно добавить в frontend change).
+- [x] 2.1 Нет обязательных UI-задач (типы можно добавить в frontend change).
 
 ## 3. Docs (trello_analytics_open_spec)
 
-- [ ] 3.1 Добавить/синхронизировать `docs/api.md` (если не только generated OpenAPI в back).
+- [x] 3.1 Добавить/синхронизировать `docs/api.md` (если не только generated OpenAPI в back).
 
 ## 4. Validation
 
-- [ ] 4.1 Сверить с критериями приёмки 1–7.
-- [ ] 4.2 Выполнить `openspec validate auth-and-api --store trello-analytics` без ошибок.
+- [x] 4.1 Сверить с критериями приёмки 1–7.
+- [x] 4.2 Выполнить `openspec validate auth-and-api --store trello-analytics` без ошибок.

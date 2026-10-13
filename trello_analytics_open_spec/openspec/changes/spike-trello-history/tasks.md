@@ -40,9 +40,9 @@ Change готов к archive, когда:
 
 ## 4. Frontend (trello_analytics_front)
 
-- [ ] 4.1 Нет обязательных задач в этом change (UI вне scope). При появлении необходимости — только ссылка в docs, без экранов.
+- [x] 4.1 Нет обязательных задач в этом change (UI вне scope). При появлении необходимости — только ссылка в docs, без экранов. (N/A complete)
 
 ## 5. Validation
 
-- [ ] 5.1 Сверить результат с критериями приёмки 1–7 в начале файла.
-- [ ] 5.2 Выполнить `openspec validate spike-trello-history --store trello-analytics` без ошибок.
+- [x] 5.1 Сверить результат с критериями приёмки 1–7 в начале файла.
+- [x] 5.2 Выполнить `openspec validate spike-trello-history --store trello-analytics` без ошибок.

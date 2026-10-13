@@ -1,8 +1,8 @@
 # Модель данных PostgreSQL
 
-**Статус:** продуктовая схема после bootstrap (`000001` + `000002_core_schema`).  
+**Статус:** продуктовая схема после bootstrap (`000001` + `000002_core_schema` + `000003_workflow_settings`).  
 **Миграции:** `trello_analytics_back/migrations/`.  
-**Связано:** [ADR-003](architecture-decisions.md) (сырые события), [ADR-005](architecture-decisions.md) (UTC), OpenSpec change `core-data-model`.
+**Связано:** [ADR-003](architecture-decisions.md) (сырые события), [ADR-005](architecture-decisions.md) (UTC), [ADR-008](architecture-decisions.md) (workflow), OpenSpec changes `core-data-model`, `workflow-and-metrics`.
 
 Документ описывает актуальную продуктовую схему. Полный DDL — в миграциях; здесь — таблицы, ключи, индексы и правила хранения.
 
@@ -41,7 +41,8 @@
 | `board_id` | UUID FK → `boards` ON DELETE **RESTRICT** |
 | `name` | TEXT NOT NULL |
 | `is_archived` | BOOLEAN NOT NULL DEFAULT false |
-| `logical_stage` | TEXT NULL (маппинг workflow; детали — later changes) |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true — продуктовый флаг «учитывать карточки колонки в аналитике» (change `list-analytics-active`); sync не перезаписывает |
+| `logical_stage` | TEXT NULL — SSOT маппинга list → logical stage (`workflow-and-metrics`) |
 | `created_at`, `updated_at` | TIMESTAMPTZ |
 
 **Индекс:** `(board_id)`.
@@ -54,7 +55,7 @@
 | `trello_card_id` | TEXT UNIQUE NOT NULL |
 | `board_id` | UUID FK → `boards` ON DELETE **RESTRICT** |
 | `name` | TEXT NOT NULL |
-| `description`, `url` | TEXT NULL |
+| `description` | TEXT NULL |
 | `current_list_id` | UUID FK → `trello_lists` NULL, ON DELETE **RESTRICT** |
 | `created_at_trello` | TIMESTAMPTZ NULL |
 | `is_archived` | BOOLEAN NOT NULL DEFAULT false |
@@ -72,6 +73,8 @@
 | `full_name`, `username` | TEXT NULL |
 | `is_active` | BOOLEAN NOT NULL DEFAULT true |
 | `created_at`, `updated_at` | TIMESTAMPTZ |
+
+`is_active` — **продуктовый** флаг «учитывать участника в аналитике» (не зеркало Trello `deactivated`). Default `true` при INSERT; entity sync обновляет имя/username и **не** перезаписывает `is_active`. Управление: `PATCH /api/v1/members/{id}` (см. `docs/api.md` и change `member-analytics-active`).
 
 Участники Trello **не** создают автоматически записи в `app_users` (ADR-013).
 
@@ -168,6 +171,53 @@ FK: оба конца ON DELETE **CASCADE**.
 
 `COMMENT ON TABLE` в миграции явно запрещает plaintext Trello token/key в `value`.
 
+### sessions
+
+Server-side sessions for cookie `tta_session` (auth-and-api). Cookie plaintext is **never** stored — only SHA-256 hex of the cookie value in `token_hash`. Absolute TTL (default 7d) via `expires_at`. Logout sets `revoked_at`; user deactivate revokes all rows for `user_id`.
+
+| Колонка | Тип / ограничения |
+|---------|-------------------|
+| `id` | UUID PK |
+| `user_id` | UUID NOT NULL FK → `app_users` ON DELETE **CASCADE** |
+| `token_hash` | TEXT UNIQUE NOT NULL |
+| `expires_at` | TIMESTAMPTZ NOT NULL |
+| `created_at` | TIMESTAMPTZ NOT NULL |
+| `revoked_at` | TIMESTAMPTZ NULL |
+
+**Индексы:** `user_id`, `expires_at`, partial active on `token_hash` where `revoked_at IS NULL`.
+
+### workflow_settings
+
+Board-level правила workflow и пороги (1 ряд на board). Маппинг списков — в `trello_lists.logical_stage`, не здесь.
+
+| Колонка | Тип / ограничения |
+|---------|-------------------|
+| `id` | UUID PK |
+| `board_id` | UUID UNIQUE NOT NULL FK → `boards` ON DELETE **RESTRICT** |
+| `lead_time_start_rule` | TEXT NOT NULL DEFAULT `unset`, CHECK ∈ `unset` \| `card_created` \| `first_enter_stage` |
+| `lead_time_start_stage` | TEXT NULL |
+| `cycle_start_stage` | TEXT NULL |
+| `done_stages`, `blocked_stages`, `work_stages` | TEXT[] NOT NULL DEFAULT `{}` |
+| `stale_threshold_seconds` | INT NOT NULL DEFAULT 604800 (7d) |
+| `data_stale_sync_age_seconds` | INT NOT NULL DEFAULT 86400 (24h) |
+| `timezone` | TEXT NOT NULL DEFAULT `UTC` |
+| `updated_at` | TIMESTAMPTZ NOT NULL |
+| `updated_by` | UUID NULL FK → `app_users` ON DELETE **SET NULL** |
+
+### workflow_settings_revisions
+
+Append-only JSON snapshot при каждом Save (ADR-008 / OQ-006).
+
+| Колонка | Тип / ограничения |
+|---------|-------------------|
+| `id` | UUID PK |
+| `board_id` | UUID NOT NULL FK → `boards` ON DELETE **RESTRICT** |
+| `settings_json` | JSONB NOT NULL (list→stage, bug label ids, rules/пороги) |
+| `created_at` | TIMESTAMPTZ NOT NULL |
+| `created_by` | UUID NULL FK → `app_users` ON DELETE **SET NULL** |
+
+**Индекс:** `(board_id, created_at DESC)`.
+
 ---
 
 ## ON DELETE (сводка)
@@ -179,14 +229,19 @@ FK: оба конца ON DELETE **CASCADE**.
 | `card_actions.member_id` / list FKs | SET NULL |
 | `card_members`, `card_labels` | CASCADE с обеих сторон |
 | `app_settings.updated_by` | SET NULL |
+| `sessions.user_id` | CASCADE |
+| `workflow_settings.board_id` / revisions | RESTRICT |
+| `workflow_settings.updated_by` / revisions `created_by` | SET NULL |
 
 ---
 
 ## Миграции
 
 1. `000001_bootstrap` — `pgcrypto` (`gen_random_uuid`).
-2. `000002_core_schema` — все таблицы выше.
+2. `000002_core_schema` — boards…app_settings (см. выше).
+3. `000003_workflow_settings` — `workflow_settings` + `workflow_settings_revisions`.
+4. `000004_sessions` — `sessions` (+ indexes).
 
-Откат `000002` удаляет только продуктовые таблицы; bootstrap / `pgcrypto` не трогает.
+Откат `000004` удаляет `sessions`. Откат `000003` удаляет только workflow-таблицы. Откат `000002` удаляет продуктовые таблицы; bootstrap / `pgcrypto` не трогает.
 
 Локально: см. `docs/local-development.md` (`.\scripts\dev.ps1 migrate-up` / `migrate-down`).

@@ -13,7 +13,7 @@
 - **Дата прогона:** 2026-10-12
 - **Инструмент:** `trello_analytics_back` — CLI `cmd/trello-spike`, клиент `internal/trello` (read-only)
 - **Credentials:** env only (не в Git, не в этом документе)
-- **Доска:** shortLink `844d4HSG`, id `6604567abc40079afb093817`
+- **Доска:** shortLink `<BOARD_SHORTLINK>`, id `<TRELLO_BOARD_ID>` (реальные значения только в локальном env / evidence, не в Git)
 - **Параметры board actions:** `limit=50`, 5 страниц; cursor `before=<last action id>`
 - **Evidence (локально, не commit):** `trello_analytics_back/tmp/trello-spike/`
 

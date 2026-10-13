@@ -85,7 +85,7 @@ Workset, чтобы видеть спеки и код вместе.
 PowerShell (одна строка; `^` из CMD здесь не работает, флаг — `--member`, не `--add`):
 
 ```powershell
-openspec workset create trello-analytics --member C:\Users\user\Developing\trello_analytics\trello_analytics_open_spec --member C:\Users\user\Developing\trello_analytics\trello_analytics_back --member C:\Users\user\Developing\trello_analytics\trello_analytics_front
+openspec workset create trello-analytics --member <путь>/trello_analytics_open_spec --member <путь>/trello_analytics_back --member <путь>/trello_analytics_front
 openspec workset open trello-analytics
 ```
 

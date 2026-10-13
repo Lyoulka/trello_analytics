@@ -8,6 +8,6 @@
 - OpenSpec store: `trello-analytics` (не создавайте локальные openspec/specs)
 
 ## Роли
-`/worker-go`, `/worker-db`, `/orchestrator`, `/tester`, `/reviewer`, `/debugger`, `/architect`, `/worker-devops`
+`/worker-go`, `/worker-db`, `/orchestrator`, `/tester`, `/reviewer`, `/debugger`, `/architect`, `/worker-devops`, `/browser-qa`
 
 Шаблоны отчётов: skill `agent-handoff`. Без commit/push/deploy без разрешения.

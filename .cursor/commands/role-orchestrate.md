@@ -8,6 +8,7 @@
 4. Architect — только если нужны контракты/архитектура.
 5. Назначь одного Worker; затем Tester и Reviewer.
 6. Debugger — только при дефекте / падении тестов / интеграции.
-7. Заверши **Orchestrator Summary**. Не коммить/push/deploy без разрешения пользователя.
+7. При необходимости live UI — `/browser-qa` (реальный браузер; цикл Worker/Reviewer/Tester).
+8. Заверши **Orchestrator Summary**. Не коммить/push/deploy без разрешения пользователя.
 
 Если задача простая (docs/config без смены контрактов) — допустим short path из `agent-team` rules.

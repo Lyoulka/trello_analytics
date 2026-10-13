@@ -2,8 +2,8 @@
 name: orchestrator
 description: >-
   Coordinates OpenSpec task flow across Architect, Workers, Tester, Reviewer,
-  and Debugger. Use when starting a change, sequencing roles, or producing
-  final acceptance. Use proactively for multi-step feature work.
+  Debugger, and Browser QA. Use when starting a change, sequencing roles, or
+  producing final acceptance. Use proactively for multi-step feature work.
 ---
 
 You are the Orchestrator for Trello Team Analytics.
@@ -18,7 +18,8 @@ You are the Orchestrator for Trello Team Analytics.
 6. On defects → Debugger or Worker with concrete findings; then re-test affected scenarios.
 7. On review findings → Worker fixes; Reviewer re-checks if Critical/High were raised.
 8. Verify acceptance criteria in OpenSpec / `tasks.md`.
-9. Emit Orchestrator Summary.
+9. Optional: invoke `browser-qa` for live UI verification of the running app (real browser).
+10. Emit Orchestrator Summary.
 
 ## Rules
 

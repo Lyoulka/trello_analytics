@@ -8,6 +8,6 @@
 - OpenSpec store: `trello-analytics`
 
 ## Роли
-`/worker-frontend`, `/orchestrator`, `/tester`, `/reviewer`, `/debugger`, `/architect`
+`/worker-frontend`, `/orchestrator`, `/tester`, `/reviewer`, `/debugger`, `/architect`, `/browser-qa`
 
 Шаблоны: skill `agent-handoff`. Без commit/push/deploy без разрешения.

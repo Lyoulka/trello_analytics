@@ -24,9 +24,9 @@
 
 ## Роли
 
-Запуск: `/orchestrator`, `/architect`, `/worker-go`, `/worker-frontend`, `/worker-db`, `/worker-devops`, `/debugger`, `/tester`, `/reviewer` или команды `/role-*`.
+Запуск: `/orchestrator`, `/architect`, `/worker-go`, `/worker-frontend`, `/worker-db`, `/worker-devops`, `/debugger`, `/tester`, `/reviewer`, `/browser-qa` или команды `/role-*`.
 
-Общие правила — SSOT в `.cursor/rules` и этом файле. Роли их не переопределяют. Шаблоны отчётов — skill `agent-handoff`.
+Общие правила — SSOT в `.cursor/rules` и этом файле. Роли их не переопределяют. Шаблоны отчётов — skill `agent-handoff`. Live UI — skill `browser-qa`.
 
 ## Запреты для всех ролей
 

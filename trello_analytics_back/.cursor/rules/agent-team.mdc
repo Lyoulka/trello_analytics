@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Roles
 
-Use project subagents: `orchestrator`, `architect`, `worker-go`, `worker-frontend`, `worker-db`, `worker-devops`, `debugger`, `tester`, `reviewer`.
+Use project subagents: `orchestrator`, `architect`, `worker-go`, `worker-frontend`, `worker-db`, `worker-devops`, `debugger`, `tester`, `reviewer`, `browser-qa`.
 
 Reports must follow skill `agent-handoff` templates. Do not invent alternate report formats.
 
@@ -20,6 +20,11 @@ Reports must follow skill `agent-handoff` templates. Do not invent alternate rep
 5. Independent Tester and Reviewer.
 6. Fixes via Worker; Debugger only on defects / failing tests / integration issues.
 7. Re-check affected scenarios; accept against OpenSpec/`tasks.md`; Orchestrator summary.
+8. Optional live UI gate: `browser-qa` against the running app (real browser only).
+
+## Browser QA loop
+
+When `/browser-qa` finds a confirmed defect: Defect Package → one Worker → Reviewer → Tester → browser re-check. Browser QA does not edit application code. Prefer sequential Task delegation; if nested Task is unavailable, use manual `/role-*` handoff. Do not mark FIXED without browser re-check.
 
 ## Short path
 

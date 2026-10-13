@@ -31,6 +31,17 @@
 - **WHEN** sync прерван после N страниц actions и запущен снова
 - **THEN** система MUST продолжить с сохранённого курсора и не потерять уже сохранённые события
 
+#### Scenario: Пустая доска завершает primary backfill
+- **WHEN** board actions API возвращает 0 actions и sync завершается успешно
+- **THEN** система MUST сохранить строку `sync_cursors` для `board_actions` и `primary_import_incomplete` MUST быть `false` после success
+
+### Requirement: Инкрементальный sync без head catch-up (v1)
+Повторный sync после завершённого primary backfill MUST обновлять сущности доски; MUST NOT подтягивать новые head board actions (курсор остаётся на oldest / NULL).
+
+#### Scenario: Повторный sync не догоняет голову ленты
+- **WHEN** primary backfill завершён и в Trello появились более новые actions
+- **THEN** v1 sync MUST NOT загружать эти head actions; статус MUST предупреждать о возможном отставании журнала от live Trello
+
 ### Requirement: Журнал и защита от параллельного sync
 Каждый запуск MUST отражаться в журнале sync runs; система MUST предотвращать одновременные конфликтующие sync одной доски.
 

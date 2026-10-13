@@ -22,7 +22,7 @@ Production (Nginx / systemd) этой инструкцией **не** затра
 ## Первый запуск
 
 ```powershell
-cd C:\Users\user\Developing\trello_analytics
+cd <workspace-root>
 .\scripts\dev.ps1 env-init
 .\scripts\dev.ps1 up-build
 .\scripts\dev.ps1 migrate-up
@@ -67,10 +67,10 @@ Frontend в браузере ходит на Vite; запросы `/api/*`, `/he
 
 ## Конфигурация и секреты
 
-- Шаблон: корневой `.env.example`
-- Рабочий файл: корневой `.env` (в `.gitignore`)
-- Секреты не класть в исходники и образы
-- Файл `trello_analytics_back/.env.example` относится к вспомогательному Trello/OpenSpec tooling и не заменяет корневой `.env` Compose
+- **Корневой** `.env` (шаблон `.env.example`) — Compose/Postgres: порты, `DATABASE_URL` с хостом `postgres`, frontend proxy.
+- **`trello_analytics_back/.env`** (шаблон `.env.example`) — Trello credentials и app-секреты; сервис `backend` загружает **этот** файл (`env_file`).
+- Секреты не класть в исходники и образы.
+- После смены `trello_analytics_back/.env` пересоздайте backend: `docker compose up -d --force-recreate backend`.
 
 ## Миграции
 

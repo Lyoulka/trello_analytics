@@ -1,11 +1,14 @@
 # Интеграция с Trello
 
 **Статус:** результаты spike `spike-trello-history` (выборка, не полный обход доски).  
-Остаются caveats: полная глубина истории, dedicated label types, `updateCard(closed)`, live 429 и полнота card-level history — **не подтверждено**.
+Остаются caveats: полная глубина истории, dedicated label types, `updateCard(closed)`, live 429 и полнота card-level history — **не подтверждено**.  
+Операционный sync (env, порядок импорта, resume, CLI) — §8 / changes `trello-import-sync` + `trello-sync-cli`; факты spike ниже не переписаны.
 
 Связанные артефакты:
 
 - OpenSpec change: `openspec/changes/spike-trello-history/`
+- OpenSpec change: `openspec/changes/trello-import-sync/`
+- OpenSpec change: `openspec/changes/trello-sync-cli/`
 - Детальный отчёт эксперимента: `docs/trello-history-spike-results.md`
 - OQ: `docs/architecture-decisions.md` (OQ-001 / OQ-002 частично закрыты)
 
@@ -94,8 +97,90 @@
 ## 7. Результаты эксперимента (кратко)
 
 - **Дата эксперимента:** 2026-10-12 (прогон spike CLI).
-- **Доска:** shortLink `844d4HSG` / id `6604567abc40079afb093817` (название в evidence есть; в docs без персональных данных участников).
+- **Доска:** shortLink `<BOARD_SHORTLINK>` / id `<TRELLO_BOARD_ID>` (реальные значения только в локальном env / evidence; в docs без id доски и персональных данных участников).
 - **Метод:** Go CLI `cmd/trello-spike` + `internal/trello`; credentials только из env; артефакты в `tmp/trello-spike/` (не в Git).
 - **Выборка board:** lists=20; cards≈3119 (open≈944, archived≈2175); board actions sample 5×50=250.
 - **Краткий вывод:** пагинация `before`, ключевые типы (`createCard`, list move `updateCard`, members, comments, attachments), идемпотентность и resume — подтверждены на sample. Полная глубина, archive-closed event, dedicated labels, 429 и полная card completeness — остаются **не подтверждено**.
 - **Детали:** `docs/trello-history-spike-results.md`
+
+---
+
+## 8. Operational sync (`trello-import-sync` + `trello-sync-cli`)
+
+Производственный импорт одной доски в PostgreSQL (backend). **Два entrypoint** (dual path, shared `internal/syncer.Orchestrator`):
+
+1. **CLI** `cmd/trello-sync` — ops / cron / local operator.
+2. **HTTP** `POST/GET /api/v1/sync/*` на `cmd/server` — Admin/Lead/Member по RBAC (см. `docs/api.md`).
+
+In-server periodic scheduler **не** используется в v1. Секция описывает config и поведение sync; наблюдения spike (§3–§7) не изменяет.
+
+### 8.1 Entrypoint (CLI)
+
+Из каталога `trello_analytics_back`:
+
+```bash
+go run ./cmd/trello-sync run      # default; sync до завершения
+go run ./cmd/trello-sync status   # JSON статуса качества данных в stdout
+```
+
+Без аргументов эквивалентно `run`. Spike CLI (`cmd/trello-spike`) — research tooling, не operational sync.
+
+**Exit codes (`run`):** `0` — успех; `2` — usage/config; `3` — уже running (single-flight); `4` — failed; `5` — cancelled.
+
+### 8.2 Env
+
+| Переменная | Назначение |
+|------------|------------|
+| `DATABASE_URL` | PostgreSQL DSN (обязателен для CLI) |
+| `TRELLO_API_KEY` | API key (только backend / env) |
+| `TRELLO_TOKEN` | Token (только backend / env) |
+| `TRELLO_BOARD_ID` | Id или shortLink доски |
+| `TRELLO_ACTIONS_PAGE_SIZE` | Размер страницы board actions (по умолчанию `100`, clamp `1..1000`) |
+
+`TRELLO_SYNC_INTERVAL` **не** используется: CLI и API его не читают; фоновый scheduler не поднимается. Без `DATABASE_URL` / key / token / board id CLI `run` не стартует. Для CLI `status` credentials Trello не обязательны (нужны DB + board id). HTTP sync на server требует тех же Trello env, иначе endpoints отвечают `503 sync_unavailable`.
+
+Ops pattern: cron / systemd timer на CLI и/или Admin UI → HTTP start (unit — вне этого change).
+
+### 8.3 Порядок импорта
+
+В одном run: **board → lists → members/labels → cards → board actions** (пагинация). События не выдумываются; идемпотентность по trello ids (`ON CONFLICT`).
+
+**Assignees / labels на карточках (snapshot):** при entity refresh текущий состав берётся из полей карточки Trello `idMembers` и `idLabels` (GET `/boards/{id}/cards`) и синхронизируется в `card_members` / `card_labels`. Это **не** восстановление истории назначений из actions (`addMemberToCard` и т.п.): `assigned_at` остаётся NULL, если API не отдаёт дату; снятый member помечается `removed_at`; для `card_labels` отсутствующие пары удаляются (в схеме нет soft-remove). Change: `openspec/changes/sync-card-assignees/`.
+
+### 8.4 Resume (board actions)
+
+- Курсор в `sync_cursors`: `resource_type=board_actions`, `cursor_value` = id последнего успешно закоммиченного action.
+- Следующий запрос к Trello: `before=<cursor_value>` (как в spike).
+- Курсор обновляется только после успешного commit страницы; сбой mid-page оставляет предыдущий курсор.
+- Пустая доска / успешный прогон с 0 actions: строка `sync_cursors` для `board_actions` всё равно создаётся (`cursor_value` NULL), чтобы отметить завершение primary backfill.
+
+### 8.4.1 После primary (v1 — без head catch-up)
+
+После успешного первичного backfill курсор остаётся на **oldest** action id (или NULL при 0 actions). Повторные sync в v1:
+
+- **делают** refresh сущностей (board/lists/members/labels/cards) и при незавершённом backfill — resume дальше в прошлое через `before`;
+- **не** подтягивают новые actions у «головы» ленты (нет watermark / since-latest catch-up).
+
+Журнал actions в БД может отставать от live Trello; это отражается в `trello-sync status` → `warnings`. Head catch-up — follow-up вне этого change.
+
+### 8.5 Single-flight
+
+- In-process mutex + статус `running` в `sync_runs`.
+- Повторный `trello-sync run` при активном run → exit `3` (второй sync не стартует).
+- При рестарте процесса orphan `running` reclaim → failed с пометкой orphaned, затем возможен новый start.
+
+### 8.6 Retry
+
+Временные ошибки: `429`, `5xx`, network/timeout. Политика: max **5** попыток на запрос; exponential backoff + jitter; при `429` учитывается `Retry-After`, если заголовок есть.  
+`401` / `403` / `404` — без retry.  
+Live `429` в spike — `not_reproduced` (§3); политика реализует HTTP retry semantics, не утверждает частоту rate limit Trello.
+
+### 8.7 Status (CLI)
+
+`go run ./cmd/trello-sync status` печатает JSON высокого уровня: `board_id`, `last_success_at`, `current_run` (id/status/counts/error_summary), `earliest_action_at` / `latest_action_at`, `counts` (cards/lists/members/labels/actions), `primary_import_incomplete`, `warnings`. Секреты в stdout/логах не отдаются.
+
+HTTP sync снова в product path (`auth-and-api`): `POST /api/v1/sync/start|retry` (Admin), `GET /status` (Member+), `GET /history` (Team Lead+). Контракты — `docs/api.md`. CLI остаётся полноценным entrypoint.
+
+### 8.8 Источник истории в v1
+
+**Board actions feed — primary.** Card-level `/actions` в v1 **не используется** (card feed часто sparse относительно board; см. §6).

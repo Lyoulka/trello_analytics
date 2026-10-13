@@ -114,7 +114,34 @@ Frontend не дублирует бизнес-формулы аналитики.
 - Участники Trello (`members`) не создают автоматически аккаунты приложения (`app_users`).
 - Invite-ссылки / magic link / OAuth — вне обязательного scope v1 (можно добавить позже без ломки ролевой модели).
 
+**Реализация сессии (auth-and-api):** HTTP-only cookie `tta_session` + таблица `sessions` в PostgreSQL (hash cookie value, absolute TTL default 7d). **JWT не используется.** Пароли — bcrypt cost 12. Контракты — `docs/api.md`.
+
+### ADR-014. Dual sync entrypoint (CLI + HTTP)
+
+**Статус:** принято (auth-and-api).
+
+Operational board import shared via `internal/syncer.Orchestrator`:
+
+- CLI `cmd/trello-sync` — ops / cron.
+- HTTP `/api/v1/sync/*` on `cmd/server` — RBAC (Admin start/retry; Member+ status; Team Lead+ history).
+
+No in-process periodic scheduler in v1. Trello credentials remain env-only.
+
+### ADR-015. Frontend UI kit и графики (v1)
+
+**Статус:** принято (frontend-analytics-ui, 2026-10-13).  
+**Закрывает:** OQ-005.
+
+| Тема | Решение |
+|------|---------|
+| UI kit | **shadcn-vue + Tailwind CSS** (Neutral tokens, компоненты копируются в `trello_analytics_front/src/components/ui/`). Без параллельных UI frameworks. |
+| Графики | **Chart.js + vue-chartjs**; цвета серий из CSS-токенов `--chart-*`. |
+| Метрики | Только из `/api/v1` (ADR-004). `null` / `available=false` ≠ `0`. |
+| Time-series | Нет dedicated series endpoint в `docs/api.md`. UI строит дневной ряд через ≤31 суточных вызовов metric API **или** показывает Empty. Workload — bar chart из `workload[]` overview/workload. |
+| Маршруты | `/login`; `/` → `/dashboard`; `/dashboard`; `/cards`; `/cards/:id/history`; `/reports`; `/settings`; `/users` (Admin). Guard: `GET /auth/me` + `meta.minRole`. |
+
 ---
+
 
 ## 2. Решения, требующие дополнительного подтверждения
 
@@ -133,16 +160,16 @@ Frontend не дублирует бизнес-формулы аналитики.
 
 | ID | Вопрос | Зачем нужно | Как закрыть |
 |----|--------|-------------|-------------|
-| OQ-003 | Точное определение начала Lead Time (Ready vs create vs иное правило команды) | Формула Lead Time | Решение тимлида после spike |
-| OQ-005 | Библиотека графиков на frontend | Зависимость UI до реализации Dashboard | Зафиксировать в docs до этапа frontend |
-| OQ-006 | Формат версий workflow (только `updated_at` vs полные snapshots) | Воспроизводимость отчётов | Design на этапе settings |
-| OQ-007 | Правило attribution при нескольких исполнителях карточки в персональной аналитике | Workload по участникам | Product-решение + docs/analytics-metrics.md |
-| OQ-008 | Пороги «данных устарели» и «задача зависла» по умолчанию | UX предупреждений | Настройки + согласование с тимлидом |
+| OQ-003 | Точное определение начала Lead Time (Ready vs create vs иное правило команды) | Формула Lead Time | **Конфиг** `lead_time_start_rule` (default `unset` + warning); финальный product default — с тимлидом; см. `docs/analytics-metrics.md` |
+| OQ-005 | Библиотека графиков на frontend | Зависимость UI до реализации Dashboard | **Закрыто (frontend-analytics-ui):** Chart.js + `vue-chartjs`. UI kit: **shadcn-vue + Tailwind CSS** (Neutral tokens; компоненты в `trello_analytics_front/src/components/ui/`). Time-series на клиенте — только через ≤31 суточных вызовов metric API или Empty; отдельного series/per-card chart endpoint в `docs/api.md` нет (gap осознанный, контракты backend не менялись). |
+| OQ-006 | Формат версий workflow (только `updated_at` vs полные snapshots) | Воспроизводимость отчётов | **частично закрыт:** audit + `workflow_settings_revisions` snapshots; привязка отчёта к revision_id — later |
+| OQ-007 | Правило attribution при нескольких исполнителях карточки в персональной аналитике | Workload по участникам | **Конфиг/docs:** team = 1×; personal = full count каждому assignee; см. `docs/analytics-metrics.md` |
+| OQ-008 | Пороги «данных устарели» и «задача зависла» по умолчанию | UX предупреждений | **Проvisional defaults** 7d / 24h в settings; финальные UX-числа — с тимлидом |
 | OQ-009 | Конкретные host/path/systemd unit/Nginx site на production-сервере | Deploy | Только после обследования существующей инфраструктуры (не выдумывать) |
 | OQ-010 | Нужен ли в v1 active/working Cycle Time | Scope метрик | По умолчанию нет (ADR-006); пересмотр после реальных данных |
 
-**Закрытые ранее:** OQ-004 → ADR-013.  
-**Не закрывать этим change:** OQ-003…OQ-010 (кроме уже закрытого OQ-004).
+**Закрытые ранее:** OQ-004 → ADR-013; OQ-005 → Chart.js + vue-chartjs + UI kit shadcn-vue/Tailwind (`frontend-analytics-ui`, 2026-10-13).  
+**Не закрывать этим change:** OQ-003, OQ-006…OQ-010.
 
 ---
 
@@ -164,6 +191,8 @@ Frontend не дублирует бизнес-формулы аналитики.
 
 - `docs/technical-specification.md` — полное ТЗ
 - `docs/database.md` — продуктовая схема PostgreSQL (таблицы, ключи, индексы, UTC, секреты); DDL в `trello_analytics_back/migrations/`
+- `docs/api.md` — REST `/api/v1` contracts (auth, analytics, cards, reports, settings, sync)
+- `docs/analytics-metrics.md` — формулы метрик, exclusions, warnings, OQ-003/007/008
 - `docs/trello-integration.md` — интеграция и ограничения истории (заполняется по итогам spike)
 - OpenSpec changes (порядок реализации):
   - `openspec/changes/spike-trello-history/` — этап 1, research истории Trello
