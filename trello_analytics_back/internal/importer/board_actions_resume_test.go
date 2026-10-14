@@ -207,6 +207,10 @@ func (f *failNextCommitStore) GetSyncCursor(ctx context.Context, resourceType st
 	return f.inner.GetSyncCursor(ctx, resourceType)
 }
 
+func (f *failNextCommitStore) UpsertSyncCursor(ctx context.Context, resourceType, cursorValue string) error {
+	return f.inner.UpsertSyncCursor(ctx, resourceType, cursorValue)
+}
+
 func (f *failNextCommitStore) CommitBoardActionsPage(
 	ctx context.Context,
 	resourceType string,
@@ -218,4 +222,12 @@ func (f *failNextCommitStore) CommitBoardActionsPage(
 		return 0, fmt.Errorf("injected commit failure")
 	}
 	return f.inner.CommitBoardActionsPage(ctx, resourceType, actions, cursorValue)
+}
+
+func (f *failNextCommitStore) InsertCardActionsPage(ctx context.Context, actions []postgres.CardActionInsert) (int64, error) {
+	return f.inner.InsertCardActionsPage(ctx, actions)
+}
+
+func (f *failNextCommitStore) CountCardActions(ctx context.Context) (int64, error) {
+	return f.inner.CountCardActions(ctx)
 }

@@ -154,14 +154,16 @@ Ops pattern: cron / systemd timer на CLI и/или Admin UI → HTTP start (un
 - Курсор обновляется только после успешного commit страницы; сбой mid-page оставляет предыдущий курсор.
 - Пустая доска / успешный прогон с 0 actions: строка `sync_cursors` для `board_actions` всё равно создаётся (`cursor_value` NULL), чтобы отметить завершение primary backfill.
 
-### 8.4.1 После primary (v1 — без head catch-up)
+### 8.4.1 После primary + head catch-up
 
-После успешного первичного backfill курсор остаётся на **oldest** action id (или NULL при 0 actions). Повторные sync в v1:
+После успешного первичного backfill курсор остаётся на **oldest** action id (или NULL при 0 actions). Повторные sync:
 
-- **делают** refresh сущностей (board/lists/members/labels/cards) и при незавершённом backfill — resume дальше в прошлое через `before`;
-- **не** подтягивают новые actions у «головы» ленты (нет watermark / since-latest catch-up).
+- **делают** refresh сущностей (board/lists/members/labels/cards);
+- если в БД уже есть `card_actions` — **head catch-up**: страницы с головы ленты (newest-first, `before`), insert `ON CONFLICT DO NOTHING`, **без** обновления курсора oldest;
+- стоп head-фазы: пустая страница, или страница без новых insert’ов, или короткая страница;
+- затем primary resume дальше в прошлое через `before=<cursor>`, если backfill ещё не завершён.
 
-Журнал actions в БД может отставать от live Trello; это отражается в `trello-sync status` → `warnings`. Head catch-up — follow-up вне этого change.
+Отдельная watermark-таблица не используется. Change: `openspec/changes/sync-actions-head-catchup/`.
 
 ### 8.5 Single-flight
 

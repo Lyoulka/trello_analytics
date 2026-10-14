@@ -38,7 +38,8 @@ type CardListItem struct {
 	IsArchived         bool       `json:"is_archived"`
 	CreatedAtTrello    *time.Time `json:"created_at_trello"`
 	LastTrelloUpdateAt *time.Time `json:"last_trello_update_at"`
-	// LastUpdatedBy* come from the latest card_actions.idMemberCreator for the card (may be empty).
+	// LastUpdatedBy* = creator of the latest card_actions row by action_date
+	// (idMemberCreator → members). Empty when no actions / unknown member.
 	LastUpdatedByMemberID *string  `json:"last_updated_by_member_id"`
 	LastUpdatedByName     *string  `json:"last_updated_by_name"`
 	MemberIDs             []string `json:"member_ids"`
@@ -232,7 +233,9 @@ type lastUpdatedBy struct {
 	Name     string
 }
 
-// cardLastUpdatedBy resolves the latest action creator per trello card id via raw_payload.
+// cardLastUpdatedBy resolves the creator of the newest action per trello card id.
+// Must follow action_date (not list-move preference): dateLastActivity often comes from
+// addMember/comment/updateCard without listAfter; preferring moves showed stale movers.
 func (s *Store) cardLastUpdatedBy(ctx context.Context, trelloCardIDs []string) (map[string]lastUpdatedBy, error) {
 	out := map[string]lastUpdatedBy{}
 	if len(trelloCardIDs) == 0 {

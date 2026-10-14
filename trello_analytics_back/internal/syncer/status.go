@@ -128,7 +128,6 @@ func defaultWarnings() []string {
 	return []string{
 		"Board action history depth may be incomplete; full Trello history truncation is not confirmed.",
 		"Card-level /actions feed is not used in v1; card history may be sparse relative to board feed.",
-		"Action log may lag live Trello; v1 does not fetch new head actions after primary backfill (no head catch-up).",
 	}
 }
 

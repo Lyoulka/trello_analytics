@@ -18,7 +18,11 @@ type BoardActionsClient interface {
 // BoardActionsStore persists actions pages and sync cursors.
 type BoardActionsStore interface {
 	GetSyncCursor(ctx context.Context, resourceType string) (cursorValue string, found bool, err error)
+	UpsertSyncCursor(ctx context.Context, resourceType, cursorValue string) error
 	CommitBoardActionsPage(ctx context.Context, resourceType string, actions []postgres.CardActionInsert, cursorValue string) (inserted int64, err error)
+	// InsertCardActionsPage inserts without updating sync_cursors (head catch-up).
+	InsertCardActionsPage(ctx context.Context, actions []postgres.CardActionInsert) (inserted int64, err error)
+	CountCardActions(ctx context.Context) (int64, error)
 }
 
 // BoardActionsImporter loads board actions into card_actions with DB-backed resume.
@@ -44,6 +48,11 @@ type ImportBoardActionsResult struct {
 	ActionsInserted int64
 	CursorValue     string
 	StoppedEarly    bool // true when StopAfterPages halted the loop
+	// Head* fill when ImportBoard runs head catch-up before primary resume.
+	HeadPagesCommitted  int
+	HeadActionsSeen     int
+	HeadActionsInserted int64
+	HeadSkipped         bool // true when catch-up skipped (no existing actions)
 }
 
 // ImportBoardActions resumes from sync_cursors (resource_type=board_actions) and
@@ -112,6 +121,76 @@ func (imp *BoardActionsImporter) ImportBoardActions(ctx context.Context, opts Im
 		if len(actions) < opts.PageLimit {
 			return out, nil
 		}
+	}
+}
+
+// ImportBoardActionsHeadCatchUp fetches newest-first pages from the board head and
+// inserts missing actions without moving the oldest backfill cursor.
+// Call only when card_actions already has rows; otherwise returns HeadSkipped.
+func (imp *BoardActionsImporter) ImportBoardActionsHeadCatchUp(ctx context.Context, opts ImportBoardActionsOptions) (ImportBoardActionsResult, error) {
+	var out ImportBoardActionsResult
+	if imp == nil || imp.Client == nil || imp.Store == nil {
+		return out, fmt.Errorf("board actions importer: client and store are required")
+	}
+	if opts.BoardID == "" {
+		return out, fmt.Errorf("board actions importer: board id is required")
+	}
+	if opts.PageLimit <= 0 {
+		return out, fmt.Errorf("board actions importer: page limit must be > 0")
+	}
+
+	n, err := imp.Store.CountCardActions(ctx)
+	if err != nil {
+		return out, err
+	}
+	if n == 0 {
+		out.HeadSkipped = true
+		return out, nil
+	}
+
+	before := ""
+	for {
+		if opts.StopAfterPages > 0 && out.PagesCommitted >= opts.StopAfterPages {
+			out.StoppedEarly = true
+			return out, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return out, err
+		}
+
+		actions, err := imp.Client.GetBoardActions(ctx, opts.BoardID, opts.PageLimit, before)
+		if err != nil {
+			return out, fmt.Errorf("head catch-up fetch board actions (before=%q): %w", before, err)
+		}
+		if len(actions) == 0 {
+			return out, nil
+		}
+
+		rows, nextBefore, err := mapActionsToInserts(actions)
+		if err != nil {
+			return out, err
+		}
+
+		inserted, err := imp.Store.InsertCardActionsPage(ctx, rows)
+		if err != nil {
+			return out, fmt.Errorf("head catch-up insert page (before=%q): %w", before, err)
+		}
+
+		out.PagesCommitted++
+		out.ActionsSeen += len(actions)
+		out.ActionsInserted += inserted
+		out.HeadPagesCommitted = out.PagesCommitted
+		out.HeadActionsSeen = out.ActionsSeen
+		out.HeadActionsInserted = out.ActionsInserted
+
+		if inserted == 0 {
+			// Entire page already known — reached existing history.
+			return out, nil
+		}
+		if len(actions) < opts.PageLimit {
+			return out, nil
+		}
+		before = nextBefore
 	}
 }
 

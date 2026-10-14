@@ -81,15 +81,13 @@ func TestStatus_EmptyBoardCompleteAfterSuccessAndCursor(t *testing.T) {
 	if st.PrimaryImportIncomplete {
 		t.Fatal("expected primary_import_incomplete=false after success + board_actions cursor (empty board)")
 	}
-	foundLag := false
 	for _, w := range st.Warnings {
 		if strings.Contains(w, "no head catch-up") || strings.Contains(w, "may lag live Trello") {
-			foundLag = true
-			break
+			t.Fatalf("unexpected obsolete head catch-up lag warning: %q", w)
 		}
 	}
-	if !foundLag {
-		t.Fatalf("expected head catch-up / lag warning, got %#v", st.Warnings)
+	if len(st.Warnings) < 1 {
+		t.Fatalf("expected default depth/card-feed warnings, got %#v", st.Warnings)
 	}
 }
 

@@ -46,6 +46,25 @@ func (s *Store) CommitBoardActionsPage(
 	return n, nil
 }
 
+// InsertCardActionsPage inserts actions (ON CONFLICT DO NOTHING) without touching sync_cursors.
+// Used by head catch-up so the oldest backfill cursor is preserved.
+func (s *Store) InsertCardActionsPage(ctx context.Context, actions []CardActionInsert) (inserted int64, err error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("begin insert card actions page tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	n, err := insertCardActionsTx(ctx, tx, actions)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit insert card actions page: %w", err)
+	}
+	return n, nil
+}
+
 func insertCardActionsTx(ctx context.Context, tx pgx.Tx, actions []CardActionInsert) (int64, error) {
 	var inserted int64
 	for _, a := range actions {

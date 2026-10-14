@@ -231,3 +231,57 @@ func TestImportBoard_WiresEntitiesThenActionsWithCursor(t *testing.T) {
 		t.Fatalf("after re-import want 1 board, got %d", nBoards)
 	}
 }
+
+func TestImportBoard_ResetsStaleCursorWhenActionsEmpty(t *testing.T) {
+	pool := openTestDB(t)
+	const boardID = "boardStaleCur"
+	isolateTestBoard(t, pool, boardID)
+	store := postgres.NewStore(pool)
+	ctx := context.Background()
+
+	snap := sampleBoardSnapshot(boardID)
+	srv := newFakeBoardServer(t, snap)
+	defer srv.Close()
+	client := trelloClientForServer(srv)
+	boardImp := &importer.BoardImporter{
+		Entities: &importer.EntitiesImporter{Client: client, Store: store},
+		Actions:  &importer.BoardActionsImporter{Client: client, Store: store},
+	}
+
+	r1, err := boardImp.ImportBoard(ctx, importer.ImportBoardOptions{
+		BoardID:          boardID,
+		ActionsPageLimit: 50,
+	})
+	if err != nil {
+		t.Fatalf("seed import: %v", err)
+	}
+	if r1.Actions.ActionsInserted < 1 {
+		t.Fatalf("seed want actions, got %+v", r1.Actions)
+	}
+	staleCursor := r1.Actions.CursorValue
+	if staleCursor == "" {
+		t.Fatal("expected non-empty oldest cursor after backfill")
+	}
+
+	// Wipe actions but leave cursor pointing at oldest (simulates shared-DB test wipe / data loss).
+	if _, err := pool.Exec(ctx, `DELETE FROM card_actions WHERE trello_action_id LIKE $1`, boardID+"-%"); err != nil {
+		t.Fatalf("wipe actions: %v", err)
+	}
+	// Ensure global count is 0 for this gate (only this board's rows existed for the test DB slice).
+	// If other leftover rows exist, Upsert still sets stale cursor; head catch-up recovers instead.
+	if err := store.UpsertSyncCursor(ctx, postgres.ResourceBoardActions, staleCursor); err != nil {
+		t.Fatalf("set stale cursor: %v", err)
+	}
+
+	r2, err := boardImp.ImportBoard(ctx, importer.ImportBoardOptions{
+		BoardID:          boardID,
+		ActionsPageLimit: 50,
+	})
+	if err != nil {
+		t.Fatalf("recovery import: %v", err)
+	}
+	n := countActionsForBoard(t, ctx, pool, boardID)
+	if n != int64(len(snap.Actions)) {
+		t.Fatalf("recovery want %d actions, got %d (result=%+v)", len(snap.Actions), n, r2.Actions)
+	}
+}

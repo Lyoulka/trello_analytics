@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"trello_analytics_back/internal/storage/postgres"
 )
 
 const (
@@ -35,8 +37,8 @@ type ImportBoardResult struct {
 	Actions  ImportBoardActionsResult
 }
 
-// ImportBoard runs entities first, then BoardActionsImporter.ImportBoardActions.
-// Does not rewrite resume logic — reuses CommitBoardActionsPage / ResourceBoardActions.
+// ImportBoard runs entities, optional head catch-up, then primary board-actions resume.
+// Head catch-up does not move the oldest backfill cursor (InsertCardActionsPage only).
 func (imp *BoardImporter) ImportBoard(ctx context.Context, opts ImportBoardOptions) (ImportBoardResult, error) {
 	var out ImportBoardResult
 	if imp == nil || imp.Entities == nil || imp.Actions == nil {
@@ -53,14 +55,47 @@ func (imp *BoardImporter) ImportBoard(ctx context.Context, opts ImportBoardOptio
 	out.Entities = entities
 
 	pageLimit := resolveActionsPageLimit(opts.ActionsPageLimit)
-	actions, err := imp.Actions.ImportBoardActions(ctx, ImportBoardActionsOptions{
-		BoardID:        opts.BoardID,
-		PageLimit:      pageLimit,
-		StopAfterPages: opts.StopAfterActionsPages,
-	})
+	actionOpts := ImportBoardActionsOptions{
+		BoardID:   opts.BoardID,
+		PageLimit: pageLimit,
+		// StopAfter applies only to primary resume (tests); head uses full catch-up.
+	}
+
+	// If actions were wiped but oldest cursor remains, primary would page with
+	// before=<oldest> and insert nothing. Clear cursor so backfill starts at head.
+	nActions, err := imp.Actions.Store.CountCardActions(ctx)
 	if err != nil {
+		return out, fmt.Errorf("count card actions: %w", err)
+	}
+	if nActions == 0 {
+		if err := imp.Actions.Store.UpsertSyncCursor(ctx, postgres.ResourceBoardActions, ""); err != nil {
+			return out, fmt.Errorf("reset board_actions cursor after empty actions: %w", err)
+		}
+	}
+
+	head, err := imp.Actions.ImportBoardActionsHeadCatchUp(ctx, actionOpts)
+	if err != nil {
+		out.Actions = head
+		return out, fmt.Errorf("import board actions head catch-up: %w", err)
+	}
+
+	actionOpts.StopAfterPages = opts.StopAfterActionsPages
+	actions, err := imp.Actions.ImportBoardActions(ctx, actionOpts)
+	if err != nil {
+		// Preserve head counters on failure of primary.
+		actions.HeadPagesCommitted = head.HeadPagesCommitted
+		actions.HeadActionsSeen = head.HeadActionsSeen
+		actions.HeadActionsInserted = head.HeadActionsInserted
+		actions.HeadSkipped = head.HeadSkipped
 		out.Actions = actions
 		return out, fmt.Errorf("import board actions: %w", err)
+	}
+	actions.HeadPagesCommitted = head.HeadPagesCommitted
+	actions.HeadActionsSeen = head.HeadActionsSeen
+	actions.HeadActionsInserted = head.HeadActionsInserted
+	actions.HeadSkipped = head.HeadSkipped
+	if head.HeadSkipped {
+		actions.HeadSkipped = true
 	}
 	out.Actions = actions
 	return out, nil
